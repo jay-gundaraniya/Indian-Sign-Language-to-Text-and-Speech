@@ -55,4 +55,4 @@ for label_index, label in enumerate(os.listdir(DATASET_DIR)):
 with open(OUTPUT_FILE, 'wb') as f:
     pickle.dump({'data': data, 'labels': labels, 'label_map': label_map}, f)
 
-print(f"✅ Dataset preprocessing complete! Saved as '{OUTPUT_FILE}'")
+print(f"Dataset preprocessing complete! Saved as '{OUTPUT_FILE}'")
