@@ -28,4 +28,4 @@ print(f'Model Accuracy: {accuracy * 100:.2f}%')
 with open('model.p', 'wb') as f:
     pickle.dump({'model': model, 'label_map': label_map}, f)
 
-print("✅ Training complete! Model saved as 'model.p'")
+print(" Training complete! Model saved as 'model.p'")
