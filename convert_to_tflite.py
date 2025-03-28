@@ -11,4 +11,4 @@ tflite_model = converter.convert()
 with open("model.tflite", "wb") as f:
     f.write(tflite_model)
 
-print("✅ model.tflite created successfully!")
+print("model.tflite created successfully!")

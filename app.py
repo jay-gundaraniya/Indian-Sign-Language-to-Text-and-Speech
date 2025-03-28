@@ -29,6 +29,7 @@ except Exception as e:
 last_spoken_text = None
 last_detection_time = 0
 prediction_interval = 1.0
+confidence_threshold = 0.4
 
 @app.route('/')
 def index():
@@ -49,7 +50,7 @@ def text_to_speech(text, lang='hi'):
 
             data, samplerate = sf.read("temp_audio.mp3")
             sd.play(data, samplerate)
-            sd.wait() 
+            sd.wait()
 
         except Exception as e:
             print("Speech Error:", e)
@@ -81,6 +82,7 @@ def generate_frames():
         results = hands.process(frame_rgb)
 
         current_time = time.time()
+
         if results.multi_hand_landmarks and (current_time - last_detection_time) > prediction_interval:
             last_detection_time = current_time
 
@@ -97,14 +99,19 @@ def generate_frames():
                     data_aux.append(hand_landmarks.landmark[i].y - min(y_))
 
             try:
-                prediction = model.predict([np.asarray(data_aux)])[0]
-                predicted_text = label_map.get(prediction, "Unknown")
+                probs = model.predict_proba([np.asarray(data_aux)])[0]
+                prediction_index = np.argmax(probs)
+                confidence = probs[prediction_index]
 
-                print(f"Detected Sign: {predicted_text}")
+                if confidence >= confidence_threshold:
+                    predicted_text = label_map.get(prediction_index, "Unknown")
+                    print(f"Detected Sign: {predicted_text} (Confidence: {confidence:.2f})")
 
-                socketio.emit('prediction', {'text': predicted_text})
+                    socketio.emit('prediction', {'text': predicted_text})
 
-                threading.Thread(target=text_to_speech, args=(predicted_text, "hi"), daemon=True).start()
+                    threading.Thread(target=text_to_speech, args=(predicted_text, "hi"), daemon=True).start()
+                else:
+                    print(f"Low confidence ({confidence:.2f}), ignoring prediction.")
 
             except Exception as e:
                 print("Prediction Error:", e)

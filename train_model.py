@@ -37,4 +37,4 @@ print(f'Model Accuracy: {test_acc * 100:.2f}%')
 
 # Save trained model in TensorFlow format
 model.save("trained_model.h5")
-print("✅ Training complete! Model saved as 'trained_model.h5'")
+print("Training complete! Model saved as 'trained_model.h5'")
