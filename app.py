@@ -11,6 +11,7 @@ from gtts import gTTS
 import sounddevice as sd
 import soundfile as sf
 import os
+from collections import deque
 
 warnings.filterwarnings("ignore")
 
@@ -29,11 +30,11 @@ except Exception as e:
 
 last_spoken_text = None
 last_detection_time = 0
-steady_sign = None
+prediction_queue = deque(maxlen=5)
 prediction_delay = 2
 
 @app.route('/')
-def index():
+def index():    
     return render_template('index.html')
 
 @socketio.on('connect')
@@ -69,9 +70,9 @@ def generate_frames():
     print("Camera Accessed Successfully!")
 
     mp_hands = mp.solutions.hands
-    hands = mp_hands.Hands(static_image_mode=False, min_detection_confidence=0.5, min_tracking_confidence=0.5)
+    hands = mp_hands.Hands(static_image_mode=False, min_detection_confidence=0.7, min_tracking_confidence=0.7)
 
-    global last_detection_time, steady_sign
+    global last_detection_time
 
     while True:
         ret, frame = cap.read()
@@ -103,17 +104,16 @@ def generate_frames():
                 prediction = model.predict([np.asarray(data_aux)])[0]
                 predicted_text = label_map.get(prediction, "Unknown")
 
-                if predicted_text != steady_sign:
-                    steady_sign = predicted_text
-                    last_detection_time = current_time
+                prediction_queue.append(predicted_text)
 
-                elif (current_time - last_detection_time) >= prediction_delay:
-                    print(f"Confirmed Sign: {predicted_text}")
-                    socketio.emit('prediction', {'text': predicted_text})
+                if prediction_queue.count(predicted_text) >= 4:
+                    if (current_time - last_detection_time) >= prediction_delay:
+                        print(f"Confirmed Sign: {predicted_text}")
+                        socketio.emit('prediction', {'text': predicted_text})
 
-                    threading.Thread(target=text_to_speech, args=(predicted_text, "hi"), daemon=True).start()
+                        threading.Thread(target=text_to_speech, args=(predicted_text, "hi"), daemon=True).start()
 
-                    last_detection_time = current_time
+                        last_detection_time = current_time
 
             except Exception as e:
                 print("Prediction Error:", e)
@@ -126,6 +126,8 @@ def generate_frames():
             print("Error encoding frame:", e)
             break
 
+        cv2.waitKey(1)
+        
 @app.route('/video_feed')
 def video_feed():
     return Response(generate_frames(), mimetype='multipart/x-mixed-replace; boundary=frame')
