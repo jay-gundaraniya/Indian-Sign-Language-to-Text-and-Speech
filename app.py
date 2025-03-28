@@ -10,6 +10,7 @@ import threading
 from gtts import gTTS
 import sounddevice as sd
 import soundfile as sf
+import os
 
 warnings.filterwarnings("ignore")
 
@@ -28,8 +29,8 @@ except Exception as e:
 
 last_spoken_text = None
 last_detection_time = 0
-prediction_interval = 1.0
-confidence_threshold = 0.4
+steady_sign = None
+prediction_delay = 2
 
 @app.route('/')
 def index():
@@ -41,16 +42,18 @@ def handle_connect():
 
 def text_to_speech(text, lang='hi'):
     global last_spoken_text
+
     if text.strip() and text != last_spoken_text:
         last_spoken_text = text
         print(f"Speaking: {text}")
+
         try:
             tts = gTTS(text=text, lang=lang)
             tts.save("temp_audio.mp3")
 
             data, samplerate = sf.read("temp_audio.mp3")
-            sd.play(data, samplerate)
-            sd.wait()
+            sd.play(data, samplerate, blocking=False)
+            os.remove("temp_audio.mp3")
 
         except Exception as e:
             print("Speech Error:", e)
@@ -58,7 +61,6 @@ def text_to_speech(text, lang='hi'):
 def generate_frames():
     cap = cv2.VideoCapture(0)
     cap.set(cv2.CAP_PROP_FPS, 30)
-    cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
 
     if not cap.isOpened():
         print("Error: Cannot access webcam!")
@@ -69,7 +71,7 @@ def generate_frames():
     mp_hands = mp.solutions.hands
     hands = mp_hands.Hands(static_image_mode=False, min_detection_confidence=0.5, min_tracking_confidence=0.5)
 
-    global last_detection_time
+    global last_detection_time, steady_sign
 
     while True:
         ret, frame = cap.read()
@@ -83,11 +85,10 @@ def generate_frames():
 
         current_time = time.time()
 
-        if results.multi_hand_landmarks and (current_time - last_detection_time) > prediction_interval:
-            last_detection_time = current_time
-
+        if results.multi_hand_landmarks:
             data_aux = []
             x_, y_ = [], []
+
             for hand_landmarks in results.multi_hand_landmarks:
                 for i in range(len(hand_landmarks.landmark)):
                     x = hand_landmarks.landmark[i].x
@@ -99,19 +100,20 @@ def generate_frames():
                     data_aux.append(hand_landmarks.landmark[i].y - min(y_))
 
             try:
-                probs = model.predict_proba([np.asarray(data_aux)])[0]
-                prediction_index = np.argmax(probs)
-                confidence = probs[prediction_index]
+                prediction = model.predict([np.asarray(data_aux)])[0]
+                predicted_text = label_map.get(prediction, "Unknown")
 
-                if confidence >= confidence_threshold:
-                    predicted_text = label_map.get(prediction_index, "Unknown")
-                    print(f"Detected Sign: {predicted_text} (Confidence: {confidence:.2f})")
+                if predicted_text != steady_sign:
+                    steady_sign = predicted_text
+                    last_detection_time = current_time
 
+                elif (current_time - last_detection_time) >= prediction_delay:
+                    print(f"Confirmed Sign: {predicted_text}")
                     socketio.emit('prediction', {'text': predicted_text})
 
                     threading.Thread(target=text_to_speech, args=(predicted_text, "hi"), daemon=True).start()
-                else:
-                    print(f"Low confidence ({confidence:.2f}), ignoring prediction.")
+
+                    last_detection_time = current_time
 
             except Exception as e:
                 print("Prediction Error:", e)
