@@ -36,13 +36,12 @@
             box-shadow: 0px 4px 8px rgba(0, 0, 0, 0.1);
             text-align: center;
             width: 80%;
-            max-width: 600px;
+            max-width: 800px;
         }
         #video_feed {
             width: 100%;
             border-radius: 10px;
             border: 3px solid #333;
-            transition: transform 0.3s;
         }
         .controls {
             margin-top: 20px;
@@ -53,21 +52,6 @@
             font-weight: bold;
             color: #007bff;
         }
-        .btn-custom {
-            width: 100%;
-            font-size: 16px;
-            padding: 10px;
-            border-radius: 8px;
-        }
-        .animated-border {
-            border: 3px solid transparent;
-            animation: glowing 1.5s infinite;
-        }
-        @keyframes glowing {
-            0% { border-color: #ff7675; }
-            50% { border-color: #00cec9; }
-            100% { border-color: #ff7675; }
-        }
     </style>
 </head>
 <body>
@@ -77,32 +61,14 @@
     <div class="container">
         <div class="card">
             <img id="video_feed" src="{{ url_for('video_feed') }}" alt="Live Video Feed">
-                        
-            <div class="controls">
-                <input type="text" id="translatedText" class="form-control mt-2" placeholder="Translated text will appear here" readonly>
-                <button type="button" id="resetButton" class="btn btn-danger btn-custom mt-3">Reset</button>
-            </div>
+            <input type="text" id="translatedText" class="form-control mt-2" placeholder="Translated text will appear here" readonly>
         </div>
     </div>
 
     <script>
         const socket = io();
-
-        socket.on('prediction', function (data) {
-            console.log("Received Prediction:", data.text);
-            let textBox = document.getElementById('translatedText');
-            let videoFeed = document.getElementById('video_feed');
-
-            textBox.value = data.text;
-            videoFeed.classList.add('animated-border'); 
-
-            setTimeout(() => {
-                videoFeed.classList.remove('animated-border');
-            }, 2000);
-        });
-
-        document.getElementById('resetButton').addEventListener('click', function () {
-            document.getElementById('translatedText').value = '';
+        socket.on('prediction', (data) => {
+            document.getElementById('translatedText').value = data.text;
         });
     </script>
 </body>

@@ -11,7 +11,7 @@ from gtts import gTTS
 import sounddevice as sd
 import soundfile as sf
 import os
-from collections import deque
+import collections
 
 warnings.filterwarnings("ignore")
 
@@ -30,8 +30,12 @@ except Exception as e:
 
 last_spoken_text = None
 last_detection_time = 0
-prediction_queue = deque(maxlen=5)
-prediction_delay = 2
+prediction_queue = collections.deque(maxlen=15)
+sign_stability_time = 2
+no_sign_timeout = 2.5
+low_threshold_message = "Hold Sign Steady..."
+last_detected_time = 0
+last_prediction = None
 
 @app.route('/')
 def index():    
@@ -72,7 +76,7 @@ def generate_frames():
     mp_hands = mp.solutions.hands
     hands = mp_hands.Hands(static_image_mode=False, min_detection_confidence=0.7, min_tracking_confidence=0.7)
 
-    global last_detection_time
+    global last_detection_time, last_detected_time, last_prediction
 
     while True:
         ret, frame = cap.read()
@@ -106,17 +110,25 @@ def generate_frames():
 
                 prediction_queue.append(predicted_text)
 
-                if prediction_queue.count(predicted_text) >= 4:
-                    if (current_time - last_detection_time) >= prediction_delay:
+                if prediction_queue.count(predicted_text) >= 6:  # ~3 fps assumed
+                    if (current_time - last_detected_time) >= sign_stability_time:
                         print(f"Confirmed Sign: {predicted_text}")
                         socketio.emit('prediction', {'text': predicted_text})
-
                         threading.Thread(target=text_to_speech, args=(predicted_text, "hi"), daemon=True).start()
-
-                        last_detection_time = current_time
+                        last_detected_time = current_time
+                        last_prediction = predicted_text
+                else:
+                    if last_prediction != predicted_text:
+                        print("⚠ Hold Sign Steady...")
+                        socketio.emit('prediction', {'text': low_threshold_message})
 
             except Exception as e:
                 print("Prediction Error:", e)
+
+        if last_prediction and (time.time() - last_detected_time) > no_sign_timeout:
+            print("⚠ No Sign Recognized!")
+            socketio.emit('prediction', {'text': "⚠ No Sign Recognized!"})
+            last_prediction = None
 
         try:
             ret, buffer = cv2.imencode('.jpg', frame)
@@ -127,7 +139,7 @@ def generate_frames():
             break
 
         cv2.waitKey(1)
-        
+
 @app.route('/video_feed')
 def video_feed():
     return Response(generate_frames(), mimetype='multipart/x-mixed-replace; boundary=frame')
