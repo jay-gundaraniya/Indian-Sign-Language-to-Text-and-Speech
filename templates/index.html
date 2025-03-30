@@ -36,7 +36,7 @@
             box-shadow: 0px 4px 8px rgba(0, 0, 0, 0.1);
             text-align: center;
             width: 80%;
-            max-width: 800px;
+            max-width: 700px;
         }
         #video_feed {
             width: 100%;
@@ -60,15 +60,32 @@
 
     <div class="container">
         <div class="card">
+            <label for="languageSelect">Choose Language:</label>
+            <select id="languageSelect" class="form-select">
+                <option value="hi">Hindi</option>
+                <option value="en">English</option>
+            </select>
+
             <img id="video_feed" src="{{ url_for('video_feed') }}" alt="Live Video Feed">
+
             <input type="text" id="translatedText" class="form-control mt-2" placeholder="Translated text will appear here" readonly>
+            <button type="button" id="resetButton" class="btn btn-danger mt-3">Reset</button>
         </div>
     </div>
 
     <script>
         const socket = io();
-        socket.on('prediction', (data) => {
+
+        document.getElementById("languageSelect").addEventListener("change", function () {
+            socket.emit("set_language", { language: this.value });
+        });
+
+        socket.on('prediction', function (data) {
             document.getElementById('translatedText').value = data.text;
+        });
+
+        document.getElementById('resetButton').addEventListener('click', function () {
+            document.getElementById('translatedText').value = '';
         });
     </script>
 </body>
