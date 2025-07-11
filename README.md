@@ -95,7 +95,7 @@ To bridge the communication gap by building a system that recognizes ISL signs a
 
 ### Prerequisites
 
-- Python 3.8+
+- Python 3.9
 - pip
 
 ### Installation
@@ -107,7 +107,6 @@ pip install -r requirements.txt
 
 ### Run the App
 
-```bash
 python app.py
 
 # Then open http://localhost:5000 in your browser.
